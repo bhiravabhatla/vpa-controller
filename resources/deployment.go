@@ -2,46 +2,33 @@ package resources
 
 import (
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type DeploymentRef struct {
-	*ObjectRef
+type Deployment struct {
+	*Object
 }
 
-func (d *DeploymentRef) SkipVPAAnnotationExists() (bool, error) {
+func (d *Deployment) SkipVPAAnnotationExists() bool {
 
-	deployment := apps.Deployment{}
-	err := d.Client.Get(d.Ctx, d.NamespacedName, &deployment)
-	if errors.IsNotFound(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	val, ok := deployment.Annotations["thoughtworks.org/skip-cm"]
-	if ok {
-		if val == "true" {
-			return true, err
+	if d.name() != "" {
+		val, ok := d.deploymentObj().Annotations["thoughtworks.org/skip-vpa"]
+		if ok {
+			if val == "true" {
+				return true
+			}
 		}
 	}
-	return false, err
+	return false
 }
 
-func (d *DeploymentRef) CheckAndAddFinalizer() error {
+func (d *Deployment) CheckAndAddFinalizer() error {
 
-	deployment := apps.Deployment{}
-	exists, err := d.getObjectIfExists(d.NamespacedName, &deployment)
-
-	if err != nil {
-		return err
-	}
-	if exists {
-		if !containsString(deployment.GetFinalizers(), finalizer) {
-			d.Log.WithValues("Object:", "DeploymentRef").Info("Adding Finalizers.")
-			deployment.SetFinalizers(append(deployment.GetFinalizers(), finalizer))
-			err = d.Client.Update(d.Ctx, &deployment)
+	if d.name() != "" {
+		if !containsString(d.resource.(*apps.Deployment).GetFinalizers(), finalizer) {
+			d.Log.WithValues("Object:", "Deployment: "+d.NamespacedName.String()).Info("Adding Finalizers")
+			d.resource.(*apps.Deployment).SetFinalizers(append(d.resource.(*apps.Deployment).GetFinalizers(), finalizer))
+			err := d.Client.Update(d.Ctx, d.resource)
 			if err != nil {
 				return err
 			}
@@ -51,28 +38,38 @@ func (d *DeploymentRef) CheckAndAddFinalizer() error {
 	return nil
 }
 
-func (d *DeploymentRef) HandleDeleteDeployment(c *ConfigMapRef) (bool, error) {
+func (d *Deployment) HandleDeleteDeployment(v *Vpa) (bool, error) {
 
-	deployment := apps.Deployment{}
-	_, err := d.getObjectIfExists(d.NamespacedName, &deployment)
-	if err != nil {
-		return false, err
-	}
-
-	if !deployment.ObjectMeta.DeletionTimestamp.IsZero() {
-		err := c.deleteConfigMapIfExists()
+	if d.isDeleted() {
+		err := v.deleteVPAIfExists()
 		if err != nil {
 			return false, err
 		}
-		d.Log.WithValues("Object:", "DeploymentRef").Info("Removing Finalizers for deployment - " + d.NamespacedName.String())
-		deployment.SetFinalizers(removeString(deployment.GetFinalizers(), finalizer))
-		err = d.Client.Update(d.Ctx, &deployment)
+		d.Log.WithValues("Object:", "Deployment").Info("Removing Finalizers for deployment - " + d.name())
+		d.deploymentObj().SetFinalizers(removeString(d.deploymentObj().GetFinalizers(), finalizer))
+		err = d.Client.Update(d.Ctx, d.resource)
 		if err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 	return false, nil
+}
+
+func (d *Deployment) isDeleted() bool {
+	return !d.resource.(*apps.Deployment).DeletionTimestamp.IsZero()
+}
+
+func (d *Deployment) name() string {
+	return d.resource.(*apps.Deployment).Name
+}
+
+func (d *Deployment) namespace() string {
+	return d.resource.(*apps.Deployment).Namespace
+}
+
+func (d *Deployment) deploymentObj() *apps.Deployment {
+	return d.resource.(*apps.Deployment)
 }
 
 func containsString(slice []string, str string) bool {

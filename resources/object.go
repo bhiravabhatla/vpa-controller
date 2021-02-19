@@ -10,20 +10,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ObjectRef struct {
+type Object struct {
 	Ctx            context.Context
 	Client         client.Client
 	NamespacedName types.NamespacedName
 	Log            logr.Logger
+
+	resource runtime.Object
 }
 
-func NewService(ctx context.Context, client client.Client, namespacedName types.NamespacedName, log logr.Logger) *ObjectRef {
-	return &ObjectRef{Ctx: ctx, Client: client, NamespacedName: namespacedName, Log: log}
+func NewObject(ctx context.Context, client client.Client, namespacedName types.NamespacedName, log logr.Logger, object runtime.Object) *Object {
+	return &Object{Ctx: ctx, Client: client, NamespacedName: namespacedName, Log: log, resource: object}
 }
 
-func (s *ObjectRef) getObjectIfExists(objKey client.ObjectKey, obj runtime.Object) (bool, error) {
+func (o *Object) PopulateObjectIfExists(namespacedName types.NamespacedName) (bool, error) {
 
-	err := s.Client.Get(s.Ctx, objKey, obj)
+	err := o.Client.Get(o.Ctx, namespacedName, o.resource)
 	if errors.IsNotFound(err) {
 		return false, nil
 	}

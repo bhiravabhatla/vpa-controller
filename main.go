@@ -20,7 +20,10 @@ import (
 	"flag"
 	"os"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	autoscaler "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1beta2"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,10 +35,18 @@ import (
 
 var (
 	scheme   = runtime.NewScheme()
+    SchemeGroupVersion = schema.GroupVersion{Group: "autoscaling.k8s.io", Version: "v1beta2"}
 	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&autoscaler.VerticalPodAutoscaler{},
+		&autoscaler.VerticalPodAutoscalerList{},
+		&autoscaler.VerticalPodAutoscalerCheckpoint{},
+		&autoscaler.VerticalPodAutoscalerCheckpointList{})
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+
 	_ = clientgoscheme.AddToScheme(scheme)
 
 	// +kubebuilder:scaffold:scheme
