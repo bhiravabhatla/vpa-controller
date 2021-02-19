@@ -1,10 +1,9 @@
 package resources
 
 import (
-	"context"
-
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type DeploymentRef struct {
@@ -40,6 +39,7 @@ func (d *DeploymentRef) CheckAndAddFinalizer() error {
 	}
 	if exists {
 		if !containsString(deployment.GetFinalizers(), finalizer) {
+			d.Log.WithValues("Object:", "DeploymentRef").Info("Adding Finalizers.")
 			deployment.SetFinalizers(append(deployment.GetFinalizers(), finalizer))
 			err = d.Client.Update(d.Ctx, &deployment)
 			if err != nil {
@@ -51,7 +51,7 @@ func (d *DeploymentRef) CheckAndAddFinalizer() error {
 	return nil
 }
 
-func (d *DeploymentRef) HandleDeleteDeployment(c *ConfigMapRef) (bool,error) {
+func (d *DeploymentRef) HandleDeleteDeployment(c *ConfigMapRef) (bool, error) {
 
 	deployment := apps.Deployment{}
 	_, err := d.getObjectIfExists(d.NamespacedName, &deployment)
@@ -62,18 +62,13 @@ func (d *DeploymentRef) HandleDeleteDeployment(c *ConfigMapRef) (bool,error) {
 	if !deployment.ObjectMeta.DeletionTimestamp.IsZero() {
 		err := c.deleteConfigMapIfExists()
 		if err != nil {
-			return false,err
-		}
-
-		//Get deployment again - to get a fresh revision. https://github.com/operator-framework/operator-sdk/issues/3968
-		_, err = d.getObjectIfExists(d.NamespacedName, &deployment)
-		if err != nil {
 			return false, err
 		}
+		d.Log.WithValues("Object:", "DeploymentRef").Info("Removing Finalizers for deployment - " + d.NamespacedName.String())
 		deployment.SetFinalizers(removeString(deployment.GetFinalizers(), finalizer))
-		err = d.Client.Update(context.Background(), &deployment)
+		err = d.Client.Update(d.Ctx, &deployment)
 		if err != nil {
-			return false,err
+			return false, err
 		}
 		return true, nil
 	}
@@ -98,4 +93,7 @@ func removeString(slice []string, s string) (result []string) {
 		result = append(result, item)
 	}
 	return
+}
+func getOwnerReference(deployment *apps.Deployment) []metav1.OwnerReference {
+	return []metav1.OwnerReference{*metav1.NewControllerRef(deployment, deployment.GroupVersionKind())}
 }

@@ -89,3 +89,17 @@ install-mockery:
 .PHONY: generate-mocks
 generate-mocks: install-mockery
 	$(MOCKERY) --all --dir /Users/santosh/go/pkg/mod/sigs.k8s.io/controller-runtime@v0.5.2/pkg/client  --output mocks
+
+vpa-install:
+	kubectl --context kind-kind apply -f vpa-manifests
+
+kind-create: kind-delete
+	kind create cluster
+
+kind-delete:
+	kind delete cluster
+
+local-run:
+	go run ./main.go
+
+kind-setup: kind-create vpa-install local-run

@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,7 +42,7 @@ func (r *CustomVpaReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 	//If skip annotation is present do nothing.
 	if annotationExists {
-		r.Log.Info("Skipping create/update cm")
+		r.Log.Info("Skipping create/update cm for " + req.NamespacedName.String())
 		return ctrl.Result{}, nil
 	}
 	err = deployref.CheckAndAddFinalizer()
@@ -72,10 +73,10 @@ func (r *CustomVpaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
-	//err = vpaController.Watch(&source.Kind{Type: &v1.ConfigMap{}},&handler.EnqueueRequestForObject{})
-	//if err !=nil{
-	//	return err
-	//}
+	err = vpaController.Watch(&source.Kind{Type: &v1.ConfigMap{}}, &handler.EnqueueRequestForOwner{OwnerType: &apps.Deployment{}, IsController: true})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
