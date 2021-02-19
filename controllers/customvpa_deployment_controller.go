@@ -26,7 +26,6 @@ type CustomVpaReconciler struct {
 
 // +kubebuilder:rbac:groups=vpaextensions.thoughtworks.org,resources=customvpas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=vpaextensions.thoughtworks.org,resources=customvpas/status,verbs=get;update;patch
-// +kubebuilder:docs
 
 func (r *CustomVpaReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
