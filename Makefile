@@ -94,7 +94,7 @@ vpa-install:
 	kubectl --context kind-kind apply -f vpa-manifests
 
 kind-create: kind-delete
-	kind create cluster
+	kind create cluster --image=kindest/node:v1.16.15
 
 kind-delete:
 	kind delete cluster
